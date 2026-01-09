@@ -178,7 +178,8 @@ begin
       else
         case fsm_state is
           when s_fetch_1 => mem_addr_reg <= std_logic_vector(prog_counter); fsm_state <= s_fetch_2;
-          when s_fetch_2 => instr_reg <= data_bus_mux_out; prog_counter <= prog_counter + 1; fsm_state <= s_decode;
+          -- Incrementamos 3 bytes porque cada instrucción ocupa 3 direcciones de memoria
+			 when s_fetch_2 => instr_reg <= data_bus_mux_out; prog_counter <= prog_counter + 3; fsm_state <= s_decode;
           
           when s_decode =>
             arith_op_sel <= (others => '0');
@@ -186,9 +187,9 @@ begin
               when x"01" => fsm_state <= s_load_x_1;
               when x"02" => fsm_state <= s_load_y_1;
               when x"03" | x"04" | x"05" | x"06" | x"09" | x"0E" | x"07" | x"08" | x"0B" | x"0C" | x"0D" => fsm_state <= s_execute;
-              when x"0A" => prog_counter <= prog_counter - 1; fsm_state <= s_wait_pulse;
-              when x"0F" => prog_counter <= prog_counter - 1; fsm_state <= s_idle;
-              when x"10" => prog_counter <= prog_counter - 1; fsm_state <= s_div_start;
+              when x"0A" => prog_counter <= prog_counter - 3; fsm_state <= s_wait_pulse; -- WAIT
+				  when x"0F" => prog_counter <= prog_counter - 3; fsm_state <= s_idle;       -- STOP
+				  when x"10" => prog_counter <= prog_counter - 3; fsm_state <= s_div_start; -- DIV (mantiene PC hasta terminar)
               when x"11" => fsm_state <= s_store_1;
               when others => fsm_state <= s_fetch_1;
             end case;
@@ -219,7 +220,8 @@ begin
           when s_load_y_1 => mem_addr_reg <= operand_1; fsm_state <= s_load_y_2;
           when s_load_y_2 => reg_Y <= data_bus_mux_out(15 downto 0); fsm_state <= s_fetch_1;
           
-          when s_wait_pulse => if pulse_1hz = '1' and pulse_1hz_last = '0' then prog_counter <= prog_counter + 1; fsm_state <= s_fetch_1; end if;
+          -- Sumamos 3 para avanzar a la siguiente instrucción real
+			 when s_wait_pulse => if pulse_1hz = '1' and pulse_1hz_last = '0' then prog_counter <= prog_counter + 3; fsm_state <= s_fetch_1; end if;
           when s_idle => null;
           when s_div_start => div_start <= '1'; fsm_state <= s_div_wait;
           when s_div_wait => if div_done = '1' then fsm_state <= s_div_read; end if;
@@ -227,7 +229,7 @@ begin
           when s_div_read =>
             reg_X <= x"00" & div_quotient; reg_Y <= x"00" & div_remainder; status_register <= "0000";
             if unsigned(div_quotient) = 0 then status_register(3) <= '1'; end if;
-            status_register(2) <= div_quotient(7); prog_counter <= prog_counter + 1; fsm_state <= s_fetch_1;
+            status_register(2) <= div_quotient(7); prog_counter <= prog_counter + 3; fsm_state <= s_fetch_1;
 
           when s_store_1 =>
             if operand_1 = IO_ADDR_LEDS then leds_reg <= reg_X(4 downto 0); mem_we <= '0';
