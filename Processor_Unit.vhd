@@ -111,16 +111,15 @@ begin
 	Key_Latch_Process : process(master_clk)
     begin
          if rising_edge(master_clk) then
-            -- 1. Prioridad: Reset Global (Soluciona el congelamiento)
+            -- 1. Reset Global
             if master_reset = '0' then
                 internal_key_buffer <= (others => '0');
             
-            -- 2. Si hay tecla válida, guardarla
+            -- 2. Si hay tecla válida (presionando), actualizamos
             elsif i_key_valid = '1' then
                 internal_key_buffer <= i_key_code;
                 
-            -- 3. IMPORTANTE: Si soltamos la tecla (valid=0), limpiar el buffer.
-            -- Esto soluciona el "Loop infinito" del juego.
+            -- 3. IMPORTANTE: Si soltamos (valid=0), borramos inmediatamente.
             else
                 internal_key_buffer <= (others => '0');
             end if;
@@ -201,7 +200,7 @@ begin
         -- 4. Limpiar Periféricos y Salidas
         leds_reg        <= (others => '0');
         video_ctrl_reg  <= x"10";           -- x10 = Estado inicial (Menú/A Roja)
-        output_buffer   <= (others => '0'); -- Display en 0000
+        output_buffer   <= x"0032"; -- Display en 0000
         
         -- 5. IMPORTANTE: Limpiar también el buffer de teclado que creamos
         --internal_key_buffer <= (others => '0');
