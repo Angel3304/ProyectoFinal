@@ -100,9 +100,13 @@ architecture Behavioral of Processor_Unit is
   -- Peripherals
   signal lfsr_value : std_logic_vector(7 downto 0);
   signal leds_reg : std_logic_vector(4 downto 0) := (others => '0');
-  signal video_ctrl_reg : std_logic_vector(7 downto 0) := (others => '0');
+  signal video_ctrl_reg : std_logic_vector(7 downto 0) := x"10";
+  
+  signal lfsr_reset_n : std_logic;
 
 begin
+
+	lfsr_reset_n <= not master_reset;
 
   -- Mapeo de Componentes
   U_Mem : Memory_Store_RAM 
@@ -137,7 +141,7 @@ begin
 			pulse_1hz_out => pulse_1hz);
   U_LFSR : entity work.LFSR_8bit port map (
 			clk => master_clk, 
-			reset => not master_reset, 
+			reset => lfsr_reset_n, 
 			enable => '1', 
 			q => lfsr_value);
 
@@ -170,7 +174,7 @@ begin
         reg_X <= (others => '0'); reg_Y <= (others => '0');
         status_register <= (others => '0');
         leds_reg <= (others => '0');
-        video_ctrl_reg <= (others => '0'); -- Pantalla negra al inicio
+        video_ctrl_reg <= x"10"; -- Pantalla negra al inicio
         
       elsif master_run = '1' then
         -- PAUSA si master_run es '1' (Eliminar esta línea si quieres que corra siempre o controla bien el switch)

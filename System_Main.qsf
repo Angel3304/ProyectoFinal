@@ -128,9 +128,16 @@ set_location_assignment PIN_127 -to SEG_DP
 set_location_assignment PIN_132 -to SEG_E
 set_location_assignment PIN_126 -to SEG_F
 set_location_assignment PIN_124 -to SEG_G
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to KEYPAD_COL[3]
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to KEYPAD_COL[2]
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to KEYPAD_COL[1]
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to KEYPAD_COL[0]
 set_global_assignment -name CDF_FILE output_files/Chain1.cdf
-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to KEYPAD_ROW[3]
-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to KEYPAD_ROW[2]
-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to KEYPAD_ROW[1]
-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to KEYPAD_ROW[0]
+set_global_assignment -name VHDL_FILE output_files/Processor_TB.vhd
+set_global_assignment -name EDA_TEST_BENCH_ENABLE_STATUS TEST_BENCH_MODE -section_id eda_simulation
+set_global_assignment -name EDA_NATIVELINK_SIMULATION_TEST_BENCH tb_processorunit -section_id eda_simulation
+set_global_assignment -name EDA_TEST_BENCH_NAME tb_processorunit -section_id eda_simulation
+set_global_assignment -name EDA_DESIGN_INSTANCE_NAME NA -section_id tb_processorunit
+set_global_assignment -name EDA_TEST_BENCH_MODULE_NAME Processor_TB -section_id tb_processorunit
+set_global_assignment -name EDA_TEST_BENCH_FILE output_files/Processor_TB.vhd -section_id tb_processorunit
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
