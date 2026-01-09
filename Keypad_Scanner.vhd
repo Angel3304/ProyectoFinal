@@ -14,109 +14,115 @@ entity Keypad_Scanner is
 end Keypad_Scanner;
 
 architecture Behavioral of Keypad_Scanner is
-    -- AGREGAMOS UN NUEVO ESTADO: RELEASE_WAIT
-    type state_type is (SCAN, DEBOUNCE, PRESSED, RELEASE_WAIT);
+    type state_type is (SCAN, DEBOUNCE, HOLD_AND_VALID, WAIT_RELEASE);
     signal state : state_type := SCAN;
     
     signal current_row : integer range 0 to 3 := 0;
-    signal count       : integer range 0 to 50000 := 0; 
+    signal timer       : integer range 0 to 100000 := 0; -- Timer más largo para seguridad
     
+    -- Registro interno para mantener el código estable
+    signal code_reg    : std_logic_vector(3 downto 0) := x"0";
+
 begin
+    -- Conectamos el registro a la salida
+    key_code <= code_reg;
 
     process(clk, reset)
     begin
         if reset = '0' then 
             state <= SCAN;
-            rows <= "1111";
+            rows <= "1110"; -- Iniciamos activando fila 0
+            current_row <= 0;
             key_valid <= '0';
-            key_code <= x"0";
+            code_reg <= x"0";
+            timer <= 0;
         elsif rising_edge(clk) then
             case state is
+                -- 1. BARRIDO RÁPIDO
                 when SCAN =>
                     key_valid <= '0';
-                    -- Barrido constante
-                    case current_row is
-                        when 0 => rows <= "1110";
-                        when 1 => rows <= "1101";
-                        when 2 => rows <= "1011";
-                        when 3 => rows <= "0111";
-                        when others => rows <= "1111";
-                    end case;
                     
-                    -- Si detectamos algo (AL MENOS UN CERO)
+                    -- Si detectamos una tecla presionada (alguna columna en 0)
                     if cols /= "1111" then
                         state <= DEBOUNCE;
-                        count <= 0;
+                        timer <= 0;
                     else
-                        -- Velocidad de barrido
-                        if count = 5000 then 
-                            count <= 0;
-                            if current_row = 3 then current_row <= 0; else current_row <= current_row + 1; end if;
-                        else
-                            count <= count + 1;
-                        end if;
-                    end if;
-                    
-                when DEBOUNCE =>
-                    if count = 50000 then 
-                        -- Confirmamos si sigue presionado
-                        if cols /= "1111" then
-                            state <= PRESSED;
-                            key_valid <= '1'; -- ¡VALIDAMOS LA TECLA!
-                            
-                            -- TU MAPEO CORRECTO:
-                            if current_row = 0 then
-                                if cols(0)='0' then key_code <= x"D";
-                                elsif cols(1)='0' then key_code <= x"C";
-                                elsif cols(2)='0' then key_code <= x"B";
-                                elsif cols(3)='0' then key_code <= x"A";
-                                end if;
-                            elsif current_row = 1 then
-                                if cols(0)='0' then key_code <= x"F"; -- #
-                                elsif cols(1)='0' then key_code <= x"9";
-                                elsif cols(2)='0' then key_code <= x"6";
-                                elsif cols(3)='0' then key_code <= x"3";
-                                end if;
-                            elsif current_row = 2 then
-                                if cols(0)='0' then key_code <= x"0";
-                                elsif cols(1)='0' then key_code <= x"8";
-                                elsif cols(2)='0' then key_code <= x"5";
-                                elsif cols(3)='0' then key_code <= x"2";
-                                end if;
-                            elsif current_row = 3 then
-                                if cols(0)='0' then key_code <= x"E"; -- *
-                                elsif cols(1)='0' then key_code <= x"7";
-                                elsif cols(2)='0' then key_code <= x"4";
-                                elsif cols(3)='0' then key_code <= x"1";
-                                end if;
+                        -- Siguiente fila (cambio rápido cada 200 ciclos)
+                        if timer = 200 then
+                            timer <= 0;
+                            if current_row = 3 then 
+                                current_row <= 0; 
+                                rows <= "1110"; -- Fila 0
+                            else 
+                                current_row <= current_row + 1;
+                                -- Desplazar el 0 a la siguiente fila
+                                case current_row + 1 is
+                                    when 1 => rows <= "1101";
+                                    when 2 => rows <= "1011";
+                                    when 3 => rows <= "0111";
+                                    when others => rows <= "1111";
+                                end case;
                             end if;
                         else
-                            state <= SCAN; -- Falsa alarma
+                            timer <= timer + 1;
                         end if;
-                    else
-                        count <= count + 1;
-                    end if;
-                    
-                when PRESSED =>
-                    -- Esperar a que suelte la tecla ("1111")
-                    if cols = "1111" then
-                        -- En lugar de ir a SCAN directo, vamos a verificar que sea verdad
-                        state <= RELEASE_WAIT;
-                        count <= 0;
                     end if;
 
-                -- NUEVO ESTADO PARA EVITAR QUE SE PEGUE
-                when RELEASE_WAIT =>
-                    if count = 50000 then -- Esperamos un momento (~1ms)
-                        if cols = "1111" then
-                            state <= SCAN; -- Ahora sí, seguro soltó la tecla
+                -- 2. FILTRADO DE RUIDO (DEBOUNCE)
+                when DEBOUNCE =>
+                    timer <= timer + 1;
+                    if timer = 50000 then -- Esperar ~1ms
+                        if cols /= "1111" then
+                            -- Confirmado: Tecla real. Decodificar.
+                            state <= HOLD_AND_VALID;
+                            
+                            -- Lógica de Decodificación (Fila Actual vs Columnas)
+                            if current_row = 0 then
+                                if cols(0)='0' then code_reg <= x"D";
+                                elsif cols(1)='0' then code_reg <= x"C";
+                                elsif cols(2)='0' then code_reg <= x"B";
+                                elsif cols(3)='0' then code_reg <= x"A"; end if;
+                            elsif current_row = 1 then
+                                if cols(0)='0' then code_reg <= x"F"; -- #
+                                elsif cols(1)='0' then code_reg <= x"9";
+                                elsif cols(2)='0' then code_reg <= x"6";
+                                elsif cols(3)='0' then code_reg <= x"3"; end if;
+                            elsif current_row = 2 then
+                                if cols(0)='0' then code_reg <= x"0";
+                                elsif cols(1)='0' then code_reg <= x"8";
+                                elsif cols(2)='0' then code_reg <= x"5";
+                                elsif cols(3)='0' then code_reg <= x"2"; end if;
+                            elsif current_row = 3 then
+                                if cols(0)='0' then code_reg <= x"E"; -- *
+                                elsif cols(1)='0' then code_reg <= x"7";
+                                elsif cols(2)='0' then code_reg <= x"4";
+                                elsif cols(3)='0' then code_reg <= x"1"; end if;
+                            end if;
                         else
-                            state <= PRESSED; -- Falso, rebotó y sigue presionada
+                            -- Falsa alarma
+                            state <= SCAN;
                         end if;
-                    else
-                        count <= count + 1;
                     end if;
 
+                -- 3. ENVIAR DATO Y ESPERAR
+                when HOLD_AND_VALID =>
+                    key_valid <= '1'; -- Avisar a CPU
+                    state <= WAIT_RELEASE;
+
+                -- 4. ESPERAR A QUE SUELTE (Anti-Rebote de salida)
+                when WAIT_RELEASE =>
+                    -- Mantenemos key_valid en '1' un momento, o lo bajamos?
+                    -- Para tu juego, mejor bajarlo para no disparar multiples veces.
+                    -- Pero como usamos polling en CPU, mantener el codigo es lo importante.
+                    key_valid <= '0'; 
+                    
+                    if cols = "1111" then
+                        state <= SCAN; -- Solo volvemos a escanear cuando suelte TODO
+                        timer <= 0;
+                    else
+                        -- Sigue presionado, nos quedamos aquí quietos (No escanea más)
+                        state <= WAIT_RELEASE;
+                    end if;
             end case;
         end if;
     end process;

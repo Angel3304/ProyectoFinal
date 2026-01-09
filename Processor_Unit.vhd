@@ -148,8 +148,8 @@ begin
   -- MMIO Read Logic
   data_bus_mux_out <= 
       x"0000" & lfsr_value  when mem_addr_reg = IO_ADDR_RANDOM else
-      x"00000" & i_key_code when (mem_addr_reg = IO_ADDR_KEYPAD and i_key_valid = '1') else
-      x"000000"             when (mem_addr_reg = IO_ADDR_KEYPAD and i_key_valid = '0') else
+      -- Leemos el código SIEMPRE que la dirección sea KEYPAD (xF0)
+      x"00000" & i_key_code when mem_addr_reg = IO_ADDR_KEYPAD else 
       mem_data_from_ram;
 
   -- Outputs

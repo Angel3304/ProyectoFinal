@@ -96,7 +96,7 @@ begin
       i_key_valid   => s_key_valid,
       
       -- Salidas Físicas
-      o_flags       => LEDS_FLAGS,
+      o_flags       => open,
       
       -- Display
       o_seg_a => SEG_A, o_seg_b => SEG_B, o_seg_c => SEG_C, o_seg_d => SEG_D, 
@@ -132,5 +132,9 @@ begin
       g         => RGB_G,
       b         => RGB_B
     );
-
+-- ==========================================
+    -- DEBUG: Ver código de tecla en los LEDs físicos
+    -- ==========================================
+    -- Si key_valid es '1', mostramos el código. Si no, apagamos (o mostramos 'F').
+    LEDS_FLAGS <= s_key_code when s_key_valid = '1' else "0000";
 end architecture Behavioral;
