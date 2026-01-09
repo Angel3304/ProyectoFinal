@@ -45,11 +45,12 @@ architecture Behavioral of Memory_Store_RAM is
     -- ============================================================
     
     -- 0: Inicializar Y en 0 (Para asegurar que la comparación funcione)
-    0 => OP_LDIY, 1 => x"00", 2 => x"00", 
+    
 
     -- 3: Inicializar Pantalla (Menú / A Roja)
-    3 => OP_LDI, 4 => x"10", 5 => x"00",
-    6 => OP_STX, 7 => x"D0", 8 => x"00",
+    0 => OP_LDX,  1 => x"F0", 2 => x"00",  -- Leer Teclado a X
+    3 => OP_DISP, 4 => x"00", 5 => x"00",  -- Mostrar X en 7-Seg
+    6 => OP_JUMP, 7 => x"00", 8 => x"00",  -- Volver a 0
 
     -- ================= BUCLE DE LECTURA =================
     -- 9: Leer Teclado (xF0) y guardar en X

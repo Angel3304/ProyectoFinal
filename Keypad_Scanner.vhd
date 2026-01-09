@@ -14,15 +14,16 @@ entity Keypad_Scanner is
 end Keypad_Scanner;
 
 architecture Behavioral of Keypad_Scanner is
+    -- Definición de estados (AQUÍ es donde se declara SCAN)
     type state_type is (SCAN, DEBOUNCE, HOLD_AND_VALID, WAIT_RELEASE);
     signal state : state_type := SCAN;
     
     signal current_row : integer range 0 to 3 := 0;
-    signal timer       : integer range 0 to 100000 := 0; -- Timer más largo para seguridad
+    signal timer       : integer range 0 to 100000 := 0;
     
     -- Registro interno para mantener el código estable
     signal code_reg    : std_logic_vector(3 downto 0) := x"0";
-
+    
 begin
     -- Conectamos el registro a la salida
     key_code <= code_reg;
@@ -40,7 +41,7 @@ begin
             case state is
                 -- 1. BARRIDO RÁPIDO
                 when SCAN =>
-                    key_valid <= '0';
+                    key_valid <= '0'; -- Por defecto '0' mientras buscamos
                     
                     -- Si detectamos una tecla presionada (alguna columna en 0)
                     if cols /= "1111" then
@@ -51,7 +52,7 @@ begin
                         if timer = 200 then
                             timer <= 0;
                             if current_row = 3 then 
-                                current_row <= 0; 
+                                current_row <= 0;
                                 rows <= "1110"; -- Fila 0
                             else 
                                 current_row <= current_row + 1;
@@ -76,7 +77,7 @@ begin
                             -- Confirmado: Tecla real. Decodificar.
                             state <= HOLD_AND_VALID;
                             
-                            -- Lógica de Decodificación (Fila Actual vs Columnas)
+                            -- Lógica de Decodificación
                             if current_row = 0 then
                                 if cols(0)='0' then code_reg <= x"D";
                                 elsif cols(1)='0' then code_reg <= x"C";
@@ -104,23 +105,24 @@ begin
                         end if;
                     end if;
 
-                -- 3. ENVIAR DATO Y ESPERAR
+                -- 3. ENVIAR DATO Y MANTENER VALID
                 when HOLD_AND_VALID =>
-                    key_valid <= '1'; -- Avisar a CPU
+                    key_valid <= '1'; -- Activamos la señal para la CPU
                     state <= WAIT_RELEASE;
 
                 -- 4. ESPERAR A QUE SUELTE (Anti-Rebote de salida)
                 when WAIT_RELEASE =>
-                    -- Mantenemos key_valid en '1' un momento, o lo bajamos?
-                    -- Para tu juego, mejor bajarlo para no disparar multiples veces.
-                    -- Pero como usamos polling en CPU, mantener el codigo es lo importante.
-                    key_valid <= '0'; 
+                    -- IMPORTANTE: Mantenemos valid en '1' mientras el usuario presiona.
+                    -- Esto da tiempo de sobra a la CPU para leerlo.
+                    key_valid <= '1'; 
                     
                     if cols = "1111" then
-                        state <= SCAN; -- Solo volvemos a escanear cuando suelte TODO
+                        -- El usuario soltó la tecla
+                        key_valid <= '0'; 
+                        state <= SCAN;
                         timer <= 0;
                     else
-                        -- Sigue presionado, nos quedamos aquí quietos (No escanea más)
+                        -- Sigue presionando... esperar
                         state <= WAIT_RELEASE;
                     end if;
             end case;

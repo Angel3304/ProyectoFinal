@@ -103,10 +103,22 @@ architecture Behavioral of Processor_Unit is
   signal video_ctrl_reg : std_logic_vector(7 downto 0) := x"10";
   
   signal lfsr_reset_n : std_logic;
+  signal internal_key_buffer : std_logic_vector(3 downto 0) := (others => '0');
 
 begin
 
 	lfsr_reset_n <= not master_reset;
+	Key_Latch_Process : process(master_clk)
+		begin
+			 if rising_edge(master_clk) then
+				  if master_reset = '0' then
+						internal_key_buffer <= (others => '0');
+				  elsif i_key_valid = '1' then
+						-- Guardamos el dato apenas llegue el pulso de valid
+						internal_key_buffer <= i_key_code;
+				  end if;
+			 end if;
+		end process;
 
   -- Mapeo de Componentes
   U_Mem : Memory_Store_RAM 
@@ -147,10 +159,9 @@ begin
 
   -- MMIO Read Logic
   data_bus_mux_out <= 
-      x"0000" & lfsr_value  when mem_addr_reg = IO_ADDR_RANDOM else
-      -- Leemos el código SIEMPRE que la dirección sea KEYPAD (xF0)
-      x"00000" & i_key_code when mem_addr_reg = IO_ADDR_KEYPAD else 
-      mem_data_from_ram;
+		 x"0000" & lfsr_value        when mem_addr_reg = IO_ADDR_RANDOM else
+		 x"00000" & internal_key_buffer when mem_addr_reg = IO_ADDR_KEYPAD else -- LEER BUFFER
+		 mem_data_from_ram;
 
   -- Outputs
   o_flags  <= status_register;
