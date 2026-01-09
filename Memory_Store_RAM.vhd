@@ -40,45 +40,18 @@ architecture Behavioral of Memory_Store_RAM is
   type t_mem_array is array (0 to 255) of std_logic_vector(7 downto 0);
   
   signal mem_array : t_mem_array := (
-    -- ============================================================
-    -- PROGRAMA DE DIAGNÓSTICO DE TECLADO
-    -- ============================================================
+    -- 1. Cargar 1111 en X para saber que arrancamos
+    0 => x"12", 1 => x"11", 2 => x"00", -- LDI x11
+    3 => x"06", 4 => x"00", 5 => x"00", -- DISP (Deberías ver 0011 brevemente)
     
-    -- 0: Inicializar Y en 0 (Para asegurar que la comparación funcione)
+    -- 2. Leer Teclado (Sobreescribir X)
+    6 => x"01", 7 => x"F0", 8 => x"00", -- LDX xF0 (Aquí debería entrar tu HARDCODE x5)
     
-
-    -- 3: Inicializar Pantalla (Menú / A Roja)
-    0 => OP_LDX,  1 => x"F0", 2 => x"00",  -- Leer Teclado a X
-    3 => OP_DISP, 4 => x"00", 5 => x"00",  -- Mostrar X en 7-Seg
-    6 => OP_JUMP, 7 => x"00", 8 => x"00",  -- Volver a 0
-
-    -- ================= BUCLE DE LECTURA =================
-    -- 9: Leer Teclado (xF0) y guardar en X
-    9 => OP_LDX, 10 => x"F0", 11 => x"00",
-
-    -- 12: MOSTRAR X EN DISPLAY 7 SEGMENTOS (Debug Visual)
-    -- Si la CPU lee la tecla, verás el número aquí (Ej: A=10, 1=1, etc)
-    12 => OP_DISP, 13 => x"00", 14 => x"00",
-
-    -- 15: Comparar X con Y (que vale 0)
-    15 => OP_CMP, 16 => x"00", 17 => x"00",
-
-    -- 18: Si NO es cero (Tecla presionada), saltar a "CAMBIAR PANTALLA"
-    18 => OP_BR_NZ, 19 => x"1B", 20 => x"00", -- Salta a dir 27 (x1B)
-
-    -- 21: Si es cero, volver a Leer (Dir 9)
-    21 => OP_JUMP, 22 => x"09", 23 => x"00",
+    -- 3. Mostrar el nuevo valor
+    9 => x"06", 10 => x"00", 11 => x"00", -- DISP (Si Hardcode funciona -> 0005)
     
-    -- Padding para llenar hueco
-    24 => x"00", 25 => x"00", 26 => x"00",
-
-    -- ================= CAMBIAR PANTALLA =================
-    -- 27: Si llegamos aquí, detectó tecla. Poner Barras de Colores (x20)
-    27 => OP_LDI, 28 => x"20", 29 => x"00",
-    30 => OP_STX, 31 => x"D0", 32 => x"00",
-
-    -- 33: Quedarse aquí (Loop infinito mostrando Barras)
-    33 => OP_JUMP, 34 => x"21", 35 => x"00", -- Salta a 33
+    -- 4. Loop
+    12 => x"07", 13 => x"0C", 14 => x"00", -- Jump a 12 
 
     others => x"00"
   );
