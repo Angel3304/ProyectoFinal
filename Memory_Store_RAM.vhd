@@ -92,8 +92,17 @@ architecture Behavioral of Memory_Store_RAM is
     others => x"00"
   );
 
-  -- 2. RAM: VARIABLES (Datos dinámicos)
-  signal RAM_DATA : t_mem_array := (others => x"00");
+  -- Función para inicializar la RAM con valores específicos
+    function init_ram return t_mem_array is
+        variable temp_ram : t_mem_array := (others => x"00");
+    begin
+        -- Inicializamos la dirección 128 (x80) con 50 (x32)
+        temp_ram(128) := x"32"; 
+        return temp_ram;
+    end function;
+
+    -- Usamos la función para crear la señal con el 50 ya cargado
+    signal RAM_DATA : t_mem_array := init_ram;
 
 begin
 
