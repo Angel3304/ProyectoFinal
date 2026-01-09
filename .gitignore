@@ -1,0 +1,29 @@
+# --- Directorios de basura de Quartus ---
+db/
+incremental_db/
+output_files/
+simulation/
+greybox_tmp/
+.qsys_edit/
+
+# --- Archivos temporales y de reporte ---
+*.bak
+*.qws
+*.rpt
+*.summary
+*.smsg
+*.done
+*.pin
+*.sof
+*.pof
+*.ttf
+*.jbc
+*.hif
+*.mm
+*.ppf
+*.ddb
+*.csv
+
+# --- Archivos de sistema ---
+.DS_Store
+Thumbs.db
