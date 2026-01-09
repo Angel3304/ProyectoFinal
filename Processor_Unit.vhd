@@ -159,8 +159,8 @@ begin
 
   -- MMIO Read Logic
   data_bus_mux_out <= 
-      x"0000" & lfsr_value        when mem_addr_reg = IO_ADDR_RANDOM else
-      x"00000" & x"5" when mem_addr_reg = IO_ADDR_KEYPAD else -- <--- CORRECCIÓN: Lee el Buffer
+      x"0000" & lfsr_value           when mem_addr_reg = IO_ADDR_RANDOM else
+      x"00000" & internal_key_buffer when mem_addr_reg = IO_ADDR_KEYPAD else -- Lee el buffer real
       mem_data_from_ram;
 
   -- Outputs
@@ -179,16 +179,25 @@ begin
       div_start <= '0';
       mem_we <= '0'; 
       
-      if master_reset = '0' then -- (Ojo con esta polaridad, la revisaremos luego)
-    prog_counter <= (others => '0');
-    fsm_state <= s_fetch_1;
-    reg_X <= (others => '0'); reg_Y <= (others => '0');
-    status_register <= (others => '0');
-    leds_reg <= (others => '0');
-    
-    -- CAMBIOS PARA DIAGNÓSTICO:
-    video_ctrl_reg <= x"20";          -- x20 = Barras de Colores (No la 'A')
-    output_buffer  <= x"8888";        -- Display muestra 8888 en lugar de 0000
+      if master_reset = '0' then
+        -- 1. Reiniciar Contador de Programa (PC) al inicio
+        prog_counter    <= (others => '0');
+        
+        -- 2. Reiniciar Estado de la Máquina
+        fsm_state       <= s_fetch_1;
+        
+        -- 3. Limpiar Registros Internos
+        reg_X           <= (others => '0');
+        reg_Y           <= (others => '0');
+        status_register <= (others => '0');
+        
+        -- 4. Limpiar Periféricos y Salidas
+        leds_reg        <= (others => '0');
+        video_ctrl_reg  <= x"10";           -- x10 = Estado inicial (Menú/A Roja)
+        output_buffer   <= (others => '0'); -- Display en 0000
+        
+        -- 5. IMPORTANTE: Limpiar también el buffer de teclado que creamos
+        --internal_key_buffer <= (others => '0');
         
       elsif master_run = '1' then
         -- PAUSA si master_run es '1' (Eliminar esta línea si quieres que corra siempre o controla bien el switch)

@@ -15,12 +15,12 @@ end entity;
 architecture Behavioral of Memory_Store_RAM is
 
   -- Opcodes (Tus instrucciones)
-  constant OP_LDX   : std_logic_vector(7 downto 0) := x"01"; 
-  constant OP_LDY   : std_logic_vector(7 downto 0) := x"02"; 
+  constant OP_LDX   : std_logic_vector(7 downto 0) := x"01";
+  constant OP_LDY   : std_logic_vector(7 downto 0) := x"02";
   constant OP_ADD   : std_logic_vector(7 downto 0) := x"03";
   constant OP_ADDI  : std_logic_vector(7 downto 0) := x"04";
   constant OP_CMP   : std_logic_vector(7 downto 0) := x"05";
-  constant OP_DISP  : std_logic_vector(7 downto 0) := x"06"; -- Muestra X en 7-Seg
+  constant OP_DISP  : std_logic_vector(7 downto 0) := x"06";
   constant OP_JUMP  : std_logic_vector(7 downto 0) := x"07";
   constant OP_BR_NZ : std_logic_vector(7 downto 0) := x"08";
   constant OP_SUB   : std_logic_vector(7 downto 0) := x"09";
@@ -32,41 +32,54 @@ architecture Behavioral of Memory_Store_RAM is
   constant OP_STOP  : std_logic_vector(7 downto 0) := x"0F";
   constant OP_DIV   : std_logic_vector(7 downto 0) := x"10";
   constant OP_STX   : std_logic_vector(7 downto 0) := x"11";
-  
-  -- NUEVAS
-  constant OP_LDI   : std_logic_vector(7 downto 0) := x"12";
-  constant OP_LDIY  : std_logic_vector(7 downto 0) := x"13";
+  constant OP_LDI   : std_logic_vector(7 downto 0) := x"12";  -- Nueva
+  constant OP_LDIY  : std_logic_vector(7 downto 0) := x"13";  -- Nueva
 
   type t_mem_array is array (0 to 255) of std_logic_vector(7 downto 0);
   
-  signal mem_array : t_mem_array := (
-    -- 1. Cargar 1111 en X para saber que arrancamos
-    0 => x"12", 1 => x"11", 2 => x"00", -- LDI x11
-    3 => x"06", 4 => x"00", 5 => x"00", -- DISP (Deberías ver 0011 brevemente)
+  -- PROGRAMA PRINCIPAL DE RULETA (Como constante)
+  constant mem_array : t_mem_array := (
+    -- ============================================================
+    -- INICIO: Inicialización
+    -- ============================================================
+    -- 0: Créditos Iniciales = 50 (x32)
+    0 => OP_LDI, 1 => x"32", 2 => x"00",      
+    3 => OP_STX, 4 => x"80", 5 => x"00",      -- Guardar en Créditos [x80]
+
+    -- ============================================================
+    -- ESTADO: MENU PRINCIPAL (Mostrar TU + Créditos)
+    -- ============================================================
+    -- 6: Manda comando visual x10 (Menú)
+    6 => OP_LDI, 7 => x"10", 8 => x"00",      
+    9 => OP_STX, 10 => x"D0", 11 => x"00",    -- Escribe en Video
+
+    -- 12: POLLING TECLADO (Esperar tecla para elegir color)
+    12 => OP_LDX, 13 => x"F0", 14 => x"00",   -- Lee Teclado
+    15 => OP_CMP, 16 => x"00", 17 => x"00",   -- ¿Es 0?
+    18 => OP_BR_NZ, 19 => x"18", 20 => x"00", -- Si NO es 0 (Tecla!), ir a procesar (Dir 24 hex = 18 hex ? No, 24 dec = 18 hex)
+                                              -- CUIDADO: 24 decimal = x18 hexadecimal.
+    21 => OP_JUMP, 22 => x"0C", 23 => x"00",  -- Si es 0, repetir (Ir a 12 decimal = x0C)
+
+    -- ============================================================
+    -- PROCESAR COLOR (Guardar selección)
+    -- ============================================================
+    -- Dir 24 (x18): Guardar tecla en [x81]
+    24 => OP_STX, 25 => x"81", 26 => x"00",
     
-    -- 2. Leer Teclado (Sobreescribir X)
-    6 => x"01", 7 => x"F0", 8 => x"00", -- LDX xF0 (Aquí debería entrar tu HARDCODE x5)
+    -- FEEDBACK VISUAL: Mostrar barras de colores (x20)
+    27 => OP_LDI, 28 => x"20", 29 => x"00",
+    30 => OP_STX, 31 => x"D0", 32 => x"00",
     
-    -- 3. Mostrar el nuevo valor
-    9 => x"06", 10 => x"00", 11 => x"00", -- DISP (Si Hardcode funciona -> 0005)
-    
-    -- 4. Loop
-    12 => x"07", 13 => x"0C", 14 => x"00", -- Jump a 12 
+    -- (Aquí continuaría tu lógica de apuesta...)
+    -- Por ahora, dejemos un bucle aquí para probar hasta este punto
+    33 => OP_JUMP, 34 => x"21", 35 => x"00", -- Loop infinito en el estado de "Selección hecha"
 
     others => x"00"
   );
 
 begin
+  -- Lectura asíncrona de la constante
   Data_out <= mem_array(to_integer(unsigned(Addr_in))) & 
               mem_array(to_integer(unsigned(Addr_in)) + 1) & 
               mem_array(to_integer(unsigned(Addr_in)) + 2);
-
-  Write_Process : process(clk)
-  begin
-    if rising_edge(clk) then
-      if we = '1' then
-        mem_array(to_integer(unsigned(Addr_in))) <= Data_in(7 downto 0);
-      end if;
-    end if;
-  end process Write_Process;
 end architecture;
