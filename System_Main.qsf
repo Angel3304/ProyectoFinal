@@ -71,7 +71,6 @@ set_global_assignment -name VHDL_FILE Keypad_Scanner.vhd
 set_global_assignment -name VHDL_FILE Matrix_Controller.vhd
 set_global_assignment -name STRATIX_DEVICE_IO_STANDARD "2.5 V"
 set_location_assignment PIN_25 -to sys_reset
-set_location_assignment PIN_88 -to sys_run
 set_location_assignment PIN_23 -to clk_in
 set_location_assignment PIN_133 -to DIG1
 set_location_assignment PIN_135 -to DIG2

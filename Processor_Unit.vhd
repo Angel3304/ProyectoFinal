@@ -186,7 +186,7 @@ begin
             case op_code is
               when x"01" => fsm_state <= s_load_x_1;
               when x"02" => fsm_state <= s_load_y_1;
-              when x"03" | x"04" | x"05" | x"06" | x"09" | x"0E" | x"07" | x"08" | x"0B" | x"0C" | x"0D" => fsm_state <= s_execute;
+              when x"03" | x"04" | x"05" | x"06" | x"09" | x"0E" | x"07" | x"08" | x"0B" | x"0C" | x"0D" | x"12" | x"13"=> fsm_state <= s_execute;
               when x"0A" => prog_counter <= prog_counter - 3; fsm_state <= s_wait_pulse; -- WAIT
 				  when x"0F" => prog_counter <= prog_counter - 3; fsm_state <= s_idle;       -- STOP
 				  when x"10" => prog_counter <= prog_counter - 3; fsm_state <= s_div_start; -- DIV (mantiene PC hasta terminar)
@@ -207,6 +207,8 @@ begin
               when x"0B" => if status_register(2) = '1' then prog_counter <= unsigned(operand_1); end if;
               when x"0C" => if status_register(1) = '0' then prog_counter <= unsigned(operand_1); end if;
               when x"0D" => if status_register(0) = '0' then prog_counter <= unsigned(operand_1); end if;
+				  when x"12" => reg_X <= x"00" & operand_1; -- LDI #Num (Carga numero directo a X)
+				  when x"13" => reg_Y <= x"00" & operand_1; -- LDIY #Num (Carga numero directo a Y)
               when others => null;
             end case;
 
