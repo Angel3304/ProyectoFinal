@@ -109,16 +109,17 @@ begin
 
 	lfsr_reset_n <= not master_reset;
 	Key_Latch_Process : process(master_clk)
-		begin
-			 if rising_edge(master_clk) then
-				  if master_reset = '0' then
-						internal_key_buffer <= (others => '0');
-				  elsif i_key_valid = '1' then
-						-- Guardamos el dato apenas llegue el pulso de valid
-						internal_key_buffer <= i_key_code;
-				  end if;
-			 end if;
-		end process;
+	begin
+		 if rising_edge(master_clk) then
+            -- Si la tecla es válida, guardamos el código.
+            -- Si NO es válida (usuario soltó), ponemos 0.
+            if i_key_valid = '1' then
+                internal_key_buffer <= i_key_code;
+            else
+                internal_key_buffer <= x"0"; 
+            end if;
+		 end if;
+	end process;
 
   -- Mapeo de Componentes
   U_Mem : Memory_Store_RAM 
