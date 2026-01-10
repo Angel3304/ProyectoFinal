@@ -6,6 +6,7 @@ entity System_Main is
     -- Entradas de Sistema
     clk_in      : in  std_logic;
     sys_reset   : in  std_logic; -- Reset físico (Botón)
+	 sys_run_btn : in  STD_LOGIC;
     
     -- === TECLADO MATRICIAL ===
     -- NOTA: KEYPAD_ROW son las ENTRADAS (Deben llevar Pull-Up en Pin Planner)
@@ -88,7 +89,7 @@ begin
       master_reset  => sys_reset,
       -- FIX: Forzamos a '0' para que la CPU corra siempre (Si tu botón es Active Low)
       -- O si tu logica interna es '1'=Pausa, '0'=Run, poner '0' asegura que corra.
-      master_run    => '0', 
+      master_run    => not sys_run_btn, 
       
       -- Periféricos
       o_video_cmd   => s_video_command,

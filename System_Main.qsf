@@ -140,4 +140,5 @@ set_global_assignment -name EDA_TEST_BENCH_NAME tb_processorunit -section_id eda
 set_global_assignment -name EDA_DESIGN_INSTANCE_NAME NA -section_id tb_processorunit
 set_global_assignment -name EDA_TEST_BENCH_MODULE_NAME Processor_TB -section_id tb_processorunit
 set_global_assignment -name EDA_TEST_BENCH_FILE output_files/Processor_TB.vhd -section_id tb_processorunit
+set_location_assignment PIN_88 -to sys_run_btn
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
