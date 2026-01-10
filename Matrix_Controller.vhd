@@ -6,11 +6,7 @@ entity Matrix_Controller is
     Port (
         clk       : in  std_logic;
         reset     : in  std_logic; 
-        
-        -- CAMBIO: Ahora recibe 'video_cmd' desde la CPU (Address x"D0")
         video_cmd : in  std_logic_vector(7 downto 0); 
-        
-        -- Salidas a la protoboard
         row       : out std_logic_vector(7 downto 0); 
         r         : out std_logic_vector(0 to 7); 
         g         : out std_logic_vector(0 to 7); 
@@ -22,22 +18,17 @@ architecture Behavioral of Matrix_Controller is
 
     signal contador_reloj : integer range 0 to 50000 := 0;
     signal numero_fila    : integer range 0 to 7 := 0;
-
-    -- Decodificación del comando CPU
-    signal cmd_type : std_logic_vector(3 downto 0); -- Nibble alto (Ej: x5)
-    signal cmd_data : integer range 0 to 15;        -- Nibble bajo (Ej: x7)
+    
+    signal cmd_type : std_logic_vector(3 downto 0);
+    signal cmd_data : integer range 0 to 15;
 
     type digit_pattern_t is array (0 to 7) of std_logic_vector(7 downto 0);
     signal datos_fila_actual : std_logic_vector(7 downto 0);
     signal patron_seleccionado : digit_pattern_t;
-    
-    -- Señales para animación de giro
+
     signal giro_offset : integer range 0 to 7 := 0;
     signal count_anim  : integer range 0 to 5000000 := 0;
 
-    -- =========================================================
-    -- BANCO DE IMÁGENES (Tus números originales)
-    -- =========================================================
     function get_pattern(num : integer) return digit_pattern_t is
     begin
         case num is
@@ -51,47 +42,43 @@ architecture Behavioral of Matrix_Controller is
             when 7 => return ("01111110", "00000110", "00001100", "00011000", "00110000", "00110000", "00110000", "00000000");
             when 8 => return ("00111100", "01100110", "01100110", "00111100", "01100110", "01100110", "00111100", "00000000");
             when 9 => return ("00111100", "01100110", "01100110", "00111110", "00000110", "01100110", "00111100", "00000000");
-            
-            -- x"A" (10): Letra 'A' (Rojo)
+            -- 10: Letra 'A'
             when 10 => return ("00011000", "00111100", "01100110", "01100110", "01111110", "01100110", "01100110", "00000000");
-            -- x"B" (11): Letra 'b' (Azul)
+            -- 11: Letra 'b'
             when 11 => return ("01000000", "01000000", "01000000", "01111100", "01100110", "01100110", "01111100", "00000000");
-            -- x"C" (12): Letra 'C' (Verde)
+            -- 12: Letra 'C'
             when 12 => return ("00111100", "01100110", "01100000", "01100000", "01100000", "01100110", "00111100", "00000000");
-
             when others => return ("10000001", "01000010", "00100100", "00011000", "00011000", "00100100", "01000010", "10000001");
         end case;
     end function;
 
 begin
     
-    -- Separar comando y dato
     cmd_type <= video_cmd(7 downto 4);
     cmd_data <= to_integer(unsigned(video_cmd(3 downto 0)));
 
-    -- 1. SELECCIÓN DE PATRÓN SEGÚN COMANDO
+    -- 1. Selección de Patrón
     process(cmd_type, cmd_data, giro_offset)
     begin
         case cmd_type is
-            when x"1" => -- MENU (Muestra 'A' como ejemplo o TU)
-                 patron_seleccionado <= get_pattern(10); 
-            when x"5" => -- RESULTADO (Muestra el número ganado)
+            when x"1" => -- MENU 
+                 patron_seleccionado <= get_pattern(10);
+            when x"5" => -- RESULTADO 
                  patron_seleccionado <= get_pattern(cmd_data);
-            when x"4" => -- GIRO (Patrón dinámico)
-                 -- Crea una línea que se mueve
+            when x"4" => -- GIRO 
                  for i in 0 to 7 loop
                     if i = giro_offset then 
-                        patron_seleccionado(i) <= "11111111"; 
+                       patron_seleccionado(i) <= "11111111"; 
                     else 
-                        patron_seleccionado(i) <= "00000000"; 
+                        patron_seleccionado(i) <= "00000000";
                     end if;
                  end loop;
-            when others => -- Selección de color, etc. (No usa patrón de bits, usa color directo)
+            when others => 
                  patron_seleccionado <= (others => (others => '0'));
         end case;
     end process;
 
-    -- 2. DIVISOR DE FRECUENCIA PARA BARRIDO Y ANIMACION
+    -- 2. Divisor de Frecuencia y Animación
     process(clk)
     begin
         if rising_edge(clk) then
@@ -103,9 +90,9 @@ begin
                 contador_reloj <= contador_reloj + 1;
             end if;
             
-            -- Animación de Giro (Solo si cmd es x40)
+            -- Animación de Giro
             if cmd_type = x"4" then
-                if count_anim = 1000000 then -- Velocidad visual del giro
+                if count_anim = 1000000 then 
                     count_anim <= 0;
                     if giro_offset = 7 then giro_offset <= 0; else giro_offset <= giro_offset + 1; end if;
                 else
@@ -115,47 +102,37 @@ begin
         end if;
     end process;
 
-    -- 3. ACTIVAR FILA FÍSICA
+    -- 3. Activar Fila Física
     process(numero_fila)
     begin
         row <= (others => '0');
         row(numero_fila) <= '1'; 
     end process;
 
-    -- 4. LOGICA DE COLOR Y PIXELES
+    -- 4. Lógica de Color
     datos_fila_actual <= patron_seleccionado(numero_fila);
 
     process(numero_fila, cmd_type, cmd_data, datos_fila_actual)
         variable num_int : integer;
         variable es_rojo : boolean;
     begin
-        -- Reset de color (APAGADO = '1' en cátodo común invertido o según tu hardware)
-        -- Asumiendo tu hardware: '1' apaga, '0' enciende (como en tu código original)
-        r <= (others => '1'); g <= (others => '1'); b <= (others => '1');
+        r <= (others => '1');
+        g <= (others => '1'); 
+        b <= (others => '1');
 
         case cmd_type is
-            -- ======================================================
-            -- ESTADO: SELECCIÓN DE COLOR (Muestra 3 barras)
-            -- ======================================================
-            when x"2" =>
-                if numero_fila < 2 then      -- Arriba: ROJO
-                    r <= x"00"; -- Enciende toda la fila en Rojo
-                elsif numero_fila < 5 then   -- Medio: AZUL
+            when x"2" => -- Selección de Color
+                if numero_fila < 2 then      -- Rojo
+                     r <= x"00";
+                elsif numero_fila < 5 then   -- Azul
                     b <= x"00";
-                else                         -- Abajo: VERDE
+                else                         -- Verde
                     g <= x"00";
                 end if;
 
-            -- ======================================================
-            -- ESTADO: RESULTADO (Muestra Número + Color de Fondo)
-            -- ======================================================
-            when x"5" =>
-                -- Tu lógica original de paridad para el fondo
+            when x"5" => -- Resultado
                 num_int := cmd_data;
                 
-                -- Detectar Rojo (Simplificado pares/impares para 0-9)
-                -- 1,3,5,7,9 son Impares (ROJO en tu código original decías impares=azul? Ajusto a ruleta real o tu lógica)
-                -- Tu código original: 2,4,6,8 -> Rojo. 1,3,5,7,9 -> Azul.
                 if (num_int = 2 or num_int = 4 or num_int = 6 or num_int = 8) then
                     es_rojo := true;
                 else
@@ -164,28 +141,27 @@ begin
 
                 for col in 0 to 7 loop
                     if datos_fila_actual(col) = '1' then
-                        -- El número siempre en BLANCO o AMARILLO para que resalte
-                        r(col) <= '0'; g(col) <= '0'; b(col) <= '0'; -- Blanco
+                        r(col) <= '0';
+                        g(col) <= '0'; 
+                        b(col) <= '0'; 
                     else
                         -- Fondo
-                        if num_int = 0 then       -- Cero = Verde
+                        if num_int = 0 then       -- Verde
                             g(col) <= '0';
                         elsif es_rojo then        -- Rojo
                             r(col) <= '0';
-                        else                      -- Azul (Negro)
+                        else                      -- Azul
                             b(col) <= '0';
                         end if;
                     end if;
                 end loop;
 
-            -- ======================================================
-            -- ESTADO: MENÚ y GIRO (Dibujo simple)
-            -- ======================================================
-            when others =>
-                -- Simplemente dibuja los bits del patrón en BLANCO
+            when others => -- Menú y Giro
                 for col in 0 to 7 loop
                     if datos_fila_actual(col) = '1' then
-                        r(col) <= '0'; g(col) <= '0'; b(col) <= '0';
+                        r(col) <= '0';
+                        g(col) <= '0'; 
+                        b(col) <= '0';
                     end if;
                 end loop;
         end case;
