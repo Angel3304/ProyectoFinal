@@ -185,24 +185,21 @@ begin
       mem_we <= '0'; 
       
       if master_reset = '0' then
-        -- 1. Reiniciar Contador de Programa (PC) al inicio
         prog_counter    <= (others => '0');
-        
-        -- 2. Reiniciar Estado de la Máquina
         fsm_state       <= s_fetch_1;
-        
-        -- 3. Limpiar Registros Internos
         reg_X           <= (others => '0');
         reg_Y           <= (others => '0');
         status_register <= (others => '0');
-        
-        -- 4. Limpiar Periféricos y Salidas
         leds_reg        <= (others => '0');
-        video_ctrl_reg  <= x"10";           -- x10 = Estado inicial (Menú/A Roja)
-        output_buffer   <= x"0032"; -- Display en 0000
+        video_ctrl_reg  <= x"10";           
         
-        -- 5. IMPORTANTE: Limpiar también el buffer de teclado que creamos
-        --internal_key_buffer <= (others => '0');
+        -- Reset de Display Físico (El 50)
+        output_buffer   <= x"0032";        
+
+        -- NUEVO: Limpiar los detectores de flanco para evitar saltos raros
+        pulse_1hz_last  <= '0';
+        div_start       <= '0';
+        mem_we          <= '0';
         
       elsif master_run = '1' then
         -- PAUSA si master_run es '1' (Eliminar esta línea si quieres que corra siempre o controla bien el switch)
