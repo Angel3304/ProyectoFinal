@@ -89,7 +89,7 @@ begin
       master_reset  => sys_reset,
       -- FIX: Forzamos a '0' para que la CPU corra siempre (Si tu botón es Active Low)
       -- O si tu logica interna es '1'=Pausa, '0'=Run, poner '0' asegura que corra.
-      master_run    => not sys_run_btn, 
+      master_run    => sys_run_btn, 
       
       -- Periféricos
       o_video_cmd   => s_video_command,
