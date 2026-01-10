@@ -111,17 +111,16 @@ begin
 	Key_Latch_Process : process(master_clk)
     begin
          if rising_edge(master_clk) then
-            -- 1. Reset Global
             if master_reset = '0' then
                 internal_key_buffer <= (others => '0');
-            
-            -- 2. Si hay tecla válida (presionando), actualizamos
-            elsif i_key_valid = '1' then
-                internal_key_buffer <= i_key_code;
-                
-            -- 3. IMPORTANTE: Si soltamos (valid=0), borramos inmediatamente.
             else
-                internal_key_buffer <= (others => '0');
+                -- Si el scanner dice que es válido, lo tomamos.
+                -- Si el scanner dice que NO (valid=0), borramos a 0.
+                if i_key_valid = '1' then
+                    internal_key_buffer <= i_key_code;
+                else
+                    internal_key_buffer <= (others => '0');
+                end if;
             end if;
          end if;
     end process;
