@@ -82,7 +82,7 @@ architecture Behavioral of Memory_Store_RAM is
 
     -- 4. JUEGO Y GIRO (Dir 69 / x45)
     -- =========================================================
-    69 => OP_LDI, 70 => x"20", 71 => x"00", 
+    69 => OP_LDI, 70 => x"40", 71 => x"00", 
     72 => OP_STX, 73 => x"D0", 74 => x"00",
     
     75 => OP_WAIT, 76 => x"00", 77 => x"00", 
@@ -117,13 +117,13 @@ architecture Behavioral of Memory_Store_RAM is
     108 => OP_BR_NZ, 109 => x"7B", 110 => x"00", -- Ir a PERDER (Dir 123)
 
     -- GANASTE (Dir 111)
-    111 => OP_LDI, 112 => x"40", 113 => x"00", 
+    111 => OP_LDI, 112 => x"60", 113 => x"00", 
     114 => OP_STX, 115 => x"D0", 116 => x"00",
     117 => OP_LDI, 118 => x"99", 119 => x"00", -- Saldo 99
     120 => OP_JUMP, 121 => x"84", 122 => x"00", -- Ir a FIN (Dir 132)
 
     -- PERDISTE (Dir 123 / x7B)
-    123 => OP_LDI, 124 => x"50", 125 => x"00", 
+    123 => OP_LDI, 124 => x"70", 125 => x"00", 
     126 => OP_STX, 127 => x"D0", 128 => x"00",
     129 => OP_LDI, 130 => x"0A", 131 => x"00", -- Saldo 10
 
