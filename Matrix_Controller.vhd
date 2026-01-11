@@ -35,6 +35,10 @@ architecture Behavioral of Matrix_Controller is
     -- Señales para animación de victoria
     signal victoria_parpadeo : std_logic := '0';
     signal count_parpadeo : integer range 0 to 10000000 := 0;
+    
+    -- Señales para animación de Game Over
+    signal gameover_fase : integer range 0 to 7 := 0;
+    signal count_gameover : integer range 0 to 5000000 := 0;
 
     function get_pattern(num : integer) return digit_pattern_t is
     begin
@@ -80,6 +84,8 @@ begin
                  patron_seleccionado <= (others => "11111111");
             when x"7" => -- ANIMACIÓN DE DERROTA - Mostrar X
                  patron_seleccionado <= get_pattern(13);
+            when x"8" => -- GAME OVER - Pantalla completa
+                 patron_seleccionado <= (others => "11111111");
             when others => 
                  patron_seleccionado <= (others => (others => '0'));
         end case;
@@ -154,6 +160,23 @@ begin
                 count_parpadeo <= 0;
                 victoria_parpadeo <= '0';
             end if;
+            
+            -- Animación de GAME OVER (cascada de colores)
+            if cmd_type = x"8" then
+                if count_gameover = 3000000 then  -- Cambio de fase cada ~0.06 segundos
+                    count_gameover <= 0;
+                    if gameover_fase = 7 then
+                        gameover_fase <= 0;
+                    else
+                        gameover_fase <= gameover_fase + 1;
+                    end if;
+                else
+                    count_gameover <= count_gameover + 1;
+                end if;
+            else
+                count_gameover <= 0;
+                gameover_fase <= 0;
+            end if;
         end if;
     end process;
 
@@ -167,7 +190,7 @@ begin
     -- 4. Lógica de Color
     datos_fila_actual <= patron_seleccionado(numero_fila);
 
-    process(numero_fila, cmd_type, cmd_data, datos_fila_actual, ruleta_offset, victoria_parpadeo)
+    process(numero_fila, cmd_type, cmd_data, datos_fila_actual, ruleta_offset, victoria_parpadeo, gameover_fase)
         variable num_int : integer;
         variable es_rojo : boolean;
         variable color_pos : integer range 0 to 23;
@@ -245,6 +268,27 @@ begin
                         b(col) <= '1';
                     end if;
                 end loop;
+
+            when x"8" => -- GAME OVER - Cascada de colores rojo descendente
+                -- Efecto de "cortina" que cae desde arriba
+                if numero_fila <= gameover_fase then
+                    -- Filas ya "caídas" - ROJO INTENSO parpadeante
+                    if gameover_fase mod 2 = 0 then
+                        r <= (others => '0');
+                        g <= (others => '1');
+                        b <= (others => '1');
+                    else
+                        -- Parpadeo a naranja (rojo + un poco de verde)
+                        r <= (others => '0');
+                        g <= "00001111"; -- Verde parcial para crear naranja
+                        b <= (others => '1');
+                    end if;
+                else
+                    -- Filas aún no alcanzadas - apagadas
+                    r <= (others => '1');
+                    g <= (others => '1');
+                    b <= (others => '1');
+                end if;
 
             when x"5" => -- Resultado
                 num_int := cmd_data;
