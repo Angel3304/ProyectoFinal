@@ -30,13 +30,15 @@ architecture Behavioral of Memory_Store_RAM is
 
   type t_mem_array is array (0 to 255) of std_logic_vector(7 downto 0);
 
-  -- MAPA DE MEMORIA (DESPLAZADO A xC0 / 192 PARA DAR MÁS ESPACIO AL CÓDIGO)
-  constant R_SALDO     : std_logic_vector(7 downto 0) := x"C0"; -- 192
-  constant W_SALDO     : std_logic_vector(7 downto 0) := x"C2"; -- 194
-  constant R_APUESTA   : std_logic_vector(7 downto 0) := x"C3";
-  constant W_APUESTA   : std_logic_vector(7 downto 0) := x"C5";
-  constant R_RESULTADO : std_logic_vector(7 downto 0) := x"C6";
-  constant W_RESULTADO : std_logic_vector(7 downto 0) := x"C8";
+  -- [CAMBIO 1] MAPA DE MEMORIA REUBICADO
+  -- Movemos las variables a xD1 (209) para dejar espacio al código nuevo.
+  -- Nota: xE0 son los LEDs y xD0 es el Video, usamos el espacio intermedio.
+  constant R_SALDO     : std_logic_vector(7 downto 0) := x"D1"; -- 209
+  constant W_SALDO     : std_logic_vector(7 downto 0) := x"D3"; -- 211
+  constant R_APUESTA   : std_logic_vector(7 downto 0) := x"D4"; -- 212
+  constant W_APUESTA   : std_logic_vector(7 downto 0) := x"D6"; -- 214
+  constant R_RESULTADO : std_logic_vector(7 downto 0) := x"D7"; -- 215
+  constant W_RESULTADO : std_logic_vector(7 downto 0) := x"D9"; -- 217
 
   constant ROM_CODE : t_mem_array := (
     -- 1. INICIALIZACIÓN (Dir 0)
@@ -106,20 +108,17 @@ architecture Behavioral of Memory_Store_RAM is
     105 => OP_CMP, 106 => x"00", 107 => x"00", 
     108 => OP_BR_NZ, 109 => x"7B", 110 => x"00", -- Ir a PERDER (Dir 123)
 
-    -- GANASTE (Dir 111) -- ¡AQUÍ ESTÁ EL CAMBIO!
+    -- GANASTE (Dir 111)
     -- =========================================================
     111 => OP_LDI, 112 => x"60", 113 => x"00", -- Animación Victoria
     114 => OP_STX, 115 => x"D0", 116 => x"00",
-    -- En vez de cargar 99 fijo, SALTÁMOS a la rutina de sumar (Dir 165 / xA5)
     117 => OP_JUMP, 118 => x"A5", 119 => x"00", 
-    -- (Los bytes 120-122 quedan libres/saltados por el jump)
     120 => x"00", 121 => x"00", 122 => x"00", 
 
     -- PERDISTE (Dir 123 / x7B)
     -- =========================================================
     123 => OP_LDI, 124 => x"70", 125 => x"00", -- Animación Derrota
     126 => OP_STX, 127 => x"D0", 128 => x"00",
-    -- Saltamos a la rutina de restar (Dir 153 / x99)
     129 => OP_JUMP, 130 => x"99", 131 => x"00", 
 
     -- FIN (Dir 132 / x84)
@@ -134,7 +133,9 @@ architecture Behavioral of Memory_Store_RAM is
     147 => OP_BR_NZ, 148 => x"8A", 149 => x"00", 
     
     -- VOLVER (Dir 150)
-    150 => OP_JUMP, 151 => x"18", 152 => x"00", 
+    -- [CAMBIO 2] Ahora saltamos a la rutina de verificación (Dir 177 / xB1)
+    -- en lugar de ir directo al menú (Dir 24).
+    150 => OP_JUMP, 151 => x"B1", 152 => x"00", 
 
     -- =========================================================
     -- RUTINA 1: RESTAR 5 AL SALDO (Dir 153 / x99)
@@ -145,12 +146,32 @@ architecture Behavioral of Memory_Store_RAM is
     162 => OP_JUMP, 163 => x"84",    164 => x"00", -- Volver a FIN
 
     -- =========================================================
-    -- RUTINA 2: SUMAR 10 AL SALDO (Dir 165 / xA5) -- ¡NUEVA!
+    -- RUTINA 2: SUMAR 10 AL SALDO (Dir 165 / xA5)
     -- =========================================================
     165 => OP_LDX,  166 => R_SALDO, 167 => x"00", -- Cargar Saldo
     168 => OP_LDIY, 169 => x"0A",    170 => x"00", -- Cargar 10
     171 => OP_ADD,  172 => x"00",    173 => x"00", -- Sumar
     174 => OP_JUMP, 175 => x"84",    176 => x"00", -- Volver a FIN
+
+    -- =========================================================
+    -- [CAMBIO 3] RUTINA 3: VERIFICAR GAME OVER (Dir 177 / xB1)
+    -- =========================================================
+    -- 1. Cargar el saldo actual
+    177 => OP_LDX,  178 => R_SALDO, 179 => x"00", 
+    
+    -- 2. Comparar con 0
+    180 => OP_CMP,  181 => x"00",    182 => x"00", 
+    
+    -- 3. Si NO es cero, volver al Menú Principal (Dir 24 / x18)
+    183 => OP_BR_NZ, 184 => x"18",   185 => x"00",
+
+    -- 4. Si ES CERO (fallthrough): Activar Game Over y Bloquear
+    186 => OP_LDI,  187 => x"80",    188 => x"00", -- Cargar Cmd Game Over
+    189 => OP_STX,  190 => x"D0",    191 => x"00", -- Enviar a Matrix Video
+
+    -- 5. Bucle Infinito (Dead Loop)
+    -- Salta a la misma instrucción (192) para que "no deje apostar"
+    192 => OP_JUMP, 193 => x"C0",    194 => x"00",
 
     others => x"00"
   );
@@ -158,13 +179,15 @@ architecture Behavioral of Memory_Store_RAM is
   signal RAM_DATA : t_mem_array := (others => x"00");
 
 begin
-    -- Memoria Split (¡LÍMITE AUMENTADO A 190!)
+    -- Memoria Split
     process(Addr_in, RAM_DATA) 
         variable addr_int : integer;
     begin
         addr_int := to_integer(unsigned(Addr_in));
-        -- Aumentamos el límite para que lea el código nuevo hasta la dir 190
-        if addr_int < 190 then
+        
+        -- [CAMBIO 4] Aumentamos el límite de código ROM a 209 (antes 190)
+        -- para que la nueva rutina en 177-194 se lea correctamente desde ROM_CODE
+        if addr_int < 209 then
             Data_out <= ROM_CODE(addr_int) & ROM_CODE(addr_int + 1) & ROM_CODE(addr_int + 2);
         else
             Data_out <= RAM_DATA(addr_int) & RAM_DATA(addr_int + 1) & RAM_DATA(addr_int + 2);
@@ -174,8 +197,8 @@ begin
     process(clk)
     begin
         if rising_edge(clk) then
-            -- Solo escribir en zona de Datos (>= 190)
-            if we = '1' and to_integer(unsigned(Addr_in)) >= 190 then
+            -- Solo escribir en zona de Datos (>= 209)
+            if we = '1' and to_integer(unsigned(Addr_in)) >= 209 then
                 RAM_DATA(to_integer(unsigned(Addr_in))) <= Data_in(7 downto 0);
             end if;
         end if;
