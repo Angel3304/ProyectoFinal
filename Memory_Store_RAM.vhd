@@ -17,7 +17,6 @@ architecture Behavioral of Memory_Store_RAM is
   constant OP_LDX   : std_logic_vector(7 downto 0) := x"01";
   constant OP_LDY   : std_logic_vector(7 downto 0) := x"02";
   constant OP_ADD   : std_logic_vector(7 downto 0) := x"03";
-  -- OP_SUB utiliza el código 09 que está soportado en la ALU (Restar y guardar en X)
   constant OP_SUB   : std_logic_vector(7 downto 0) := x"09"; 
   constant OP_CMP   : std_logic_vector(7 downto 0) := x"05";
   constant OP_DISP  : std_logic_vector(7 downto 0) := x"06";
@@ -31,18 +30,18 @@ architecture Behavioral of Memory_Store_RAM is
 
   type t_mem_array is array (0 to 255) of std_logic_vector(7 downto 0);
 
-  -- MAPA DE MEMORIA
-  constant R_SALDO     : std_logic_vector(7 downto 0) := x"B0"; -- 176
-  constant W_SALDO     : std_logic_vector(7 downto 0) := x"B2"; -- 178
-  constant R_APUESTA   : std_logic_vector(7 downto 0) := x"B3";
-  constant W_APUESTA   : std_logic_vector(7 downto 0) := x"B5";
-  constant R_RESULTADO : std_logic_vector(7 downto 0) := x"B6";
-  constant W_RESULTADO : std_logic_vector(7 downto 0) := x"B8";
+  -- MAPA DE MEMORIA (DESPLAZADO A xC0 / 192 PARA DAR MÁS ESPACIO AL CÓDIGO)
+  constant R_SALDO     : std_logic_vector(7 downto 0) := x"C0"; -- 192
+  constant W_SALDO     : std_logic_vector(7 downto 0) := x"C2"; -- 194
+  constant R_APUESTA   : std_logic_vector(7 downto 0) := x"C3";
+  constant W_APUESTA   : std_logic_vector(7 downto 0) := x"C5";
+  constant R_RESULTADO : std_logic_vector(7 downto 0) := x"C6";
+  constant W_RESULTADO : std_logic_vector(7 downto 0) := x"C8";
 
   constant ROM_CODE : t_mem_array := (
     -- 1. INICIALIZACIÓN (Dir 0)
     -- =========================================================
-    0 => OP_LDI, 1 => x"32", 2 => x"00",      -- Saldo inicial = 50 (x32)
+    0 => OP_LDI, 1 => x"32", 2 => x"00",      -- Saldo inicial = 50
     3 => OP_STX, 4 => W_SALDO, 5 => x"00",      
     
     6 => OP_LDI, 7 => x"10", 8 => x"00",
@@ -88,21 +87,17 @@ architecture Behavioral of Memory_Store_RAM is
     78 => OP_WAIT, 79 => x"00", 80 => x"00",
 
     -- =========================================================
-    -- GENERACIÓN DE RESULTADO CON DIVISIÓN HW (Dir 81)
+    -- GENERACIÓN DE RESULTADO (Dir 81)
     -- =========================================================
     81 => OP_LDX, 82 => x"E1", 83 => x"00", 
-    
-    -- Divisor 38 (x26)
-    84 => OP_LDIY, 85 => x"26", 86 => x"00", 
-    
-    -- DIVIDIR (X / Y). Residuo en Y.
+    84 => OP_LDIY, 85 => x"26", 86 => x"00", -- Divisor 38
     87 => OP_DIV, 88 => x"00", 89 => x"00", 
     
-    -- X = 0 + Y (Mover residuo a X)
+    -- Recuperar Residuo (Y) a X
     90 => OP_LDI, 91 => x"00", 92 => x"00", 
     93 => OP_ADD, 94 => x"00", 95 => x"00", 
     
-    -- 5. Mostrar y Guardar
+    -- 5. Mostrar y Guardar Resultado
     96 => OP_DISP, 97 => x"00", 98 => x"00", 
     99 => OP_STX, 100 => W_RESULTADO, 101 => x"00", 
     
@@ -111,22 +106,24 @@ architecture Behavioral of Memory_Store_RAM is
     105 => OP_CMP, 106 => x"00", 107 => x"00", 
     108 => OP_BR_NZ, 109 => x"7B", 110 => x"00", -- Ir a PERDER (Dir 123)
 
-    -- GANASTE (Dir 111)
-    -- (Opcional: aquí podrías sumar también, por ahora lo dejamos fijo o como estaba)
-    111 => OP_LDI, 112 => x"60", 113 => x"00", 
-    114 => OP_STX, 115 => x"D0", 116 => x"00",
-    117 => OP_LDI, 118 => x"99", 119 => x"00", -- Saldo gana 99
-    120 => OP_JUMP, 121 => x"84", 122 => x"00", -- Ir a FIN (Dir 132)
-
-    -- PERDISTE (Dir 123 / x7B) - MODIFICADO
+    -- GANASTE (Dir 111) -- ¡AQUÍ ESTÁ EL CAMBIO!
     -- =========================================================
-    123 => OP_LDI, 124 => x"70", 125 => x"00", -- Cargar Animación Derrota
-    126 => OP_STX, 127 => x"D0", 128 => x"00", -- Enviar a Video
-    -- En vez de cargar 10 fijo, saltamos a la lógica de resta (Dir 153 / x99)
+    111 => OP_LDI, 112 => x"60", 113 => x"00", -- Animación Victoria
+    114 => OP_STX, 115 => x"D0", 116 => x"00",
+    -- En vez de cargar 99 fijo, SALTÁMOS a la rutina de sumar (Dir 165 / xA5)
+    117 => OP_JUMP, 118 => x"A5", 119 => x"00", 
+    -- (Los bytes 120-122 quedan libres/saltados por el jump)
+    120 => x"00", 121 => x"00", 122 => x"00", 
+
+    -- PERDISTE (Dir 123 / x7B)
+    -- =========================================================
+    123 => OP_LDI, 124 => x"70", 125 => x"00", -- Animación Derrota
+    126 => OP_STX, 127 => x"D0", 128 => x"00",
+    -- Saltamos a la rutina de restar (Dir 153 / x99)
     129 => OP_JUMP, 130 => x"99", 131 => x"00", 
 
     -- FIN (Dir 132 / x84)
-    -- Aquí llegamos con el nuevo saldo en X
+    -- =========================================================
     132 => OP_STX, 133 => W_SALDO, 134 => x"00", 
     135 => OP_WAIT, 136 => x"00", 137 => x"00", 
 
@@ -136,16 +133,24 @@ architecture Behavioral of Memory_Store_RAM is
     144 => OP_CMP, 145 => x"00", 146 => x"00",
     147 => OP_BR_NZ, 148 => x"8A", 149 => x"00", 
     
-    -- VOLVER A MENU (Dir 150)
+    -- VOLVER (Dir 150)
     150 => OP_JUMP, 151 => x"18", 152 => x"00", 
 
     -- =========================================================
-    -- LÓGICA EXTENDIDA: RESTAR 5 AL SALDO (Dir 153 / x99)
+    -- RUTINA 1: RESTAR 5 AL SALDO (Dir 153 / x99)
     -- =========================================================
-    153 => OP_LDX,  154 => R_SALDO, 155 => x"00", -- Cargar Saldo actual en X
-    156 => OP_LDIY, 157 => x"05",    158 => x"00", -- Cargar 5 en Y (Apuesta Fija)
-    159 => OP_SUB,  160 => x"00",    161 => x"00", -- X = X - Y (Saldo - 5)
-    162 => OP_JUMP, 163 => x"84",    164 => x"00", -- Volver a FIN (Dir 132) para guardar
+    153 => OP_LDX,  154 => R_SALDO, 155 => x"00", 
+    156 => OP_LDIY, 157 => x"05",    158 => x"00", -- Restar 5
+    159 => OP_SUB,  160 => x"00",    161 => x"00", 
+    162 => OP_JUMP, 163 => x"84",    164 => x"00", -- Volver a FIN
+
+    -- =========================================================
+    -- RUTINA 2: SUMAR 10 AL SALDO (Dir 165 / xA5) -- ¡NUEVA!
+    -- =========================================================
+    165 => OP_LDX,  166 => R_SALDO, 167 => x"00", -- Cargar Saldo
+    168 => OP_LDIY, 169 => x"0A",    170 => x"00", -- Cargar 10
+    171 => OP_ADD,  172 => x"00",    173 => x"00", -- Sumar
+    174 => OP_JUMP, 175 => x"84",    176 => x"00", -- Volver a FIN
 
     others => x"00"
   );
@@ -153,12 +158,13 @@ architecture Behavioral of Memory_Store_RAM is
   signal RAM_DATA : t_mem_array := (others => x"00");
 
 begin
-    -- Memoria Split
+    -- Memoria Split (¡LÍMITE AUMENTADO A 190!)
     process(Addr_in, RAM_DATA) 
         variable addr_int : integer;
     begin
         addr_int := to_integer(unsigned(Addr_in));
-        if addr_int < 170 then
+        -- Aumentamos el límite para que lea el código nuevo hasta la dir 190
+        if addr_int < 190 then
             Data_out <= ROM_CODE(addr_int) & ROM_CODE(addr_int + 1) & ROM_CODE(addr_int + 2);
         else
             Data_out <= RAM_DATA(addr_int) & RAM_DATA(addr_int + 1) & RAM_DATA(addr_int + 2);
@@ -168,7 +174,8 @@ begin
     process(clk)
     begin
         if rising_edge(clk) then
-            if we = '1' and to_integer(unsigned(Addr_in)) >= 170 then
+            -- Solo escribir en zona de Datos (>= 190)
+            if we = '1' and to_integer(unsigned(Addr_in)) >= 190 then
                 RAM_DATA(to_integer(unsigned(Addr_in))) <= Data_in(7 downto 0);
             end if;
         end if;
