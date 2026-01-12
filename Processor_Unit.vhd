@@ -23,12 +23,19 @@ end entity Processor_Unit;
 
 architecture Behavioral of Processor_Unit is
   
-  component Memory_Store_RAM is
+  component Memoria_ROM is
+    port(
+      Addr_in  : in  std_logic_vector(7 downto 0);
+      Data_out : out std_logic_vector(23 downto 0)
+    );
+  end component;
+
+  component Memoria_RAM is
     port(
       clk, we  : in std_logic;
       Addr_in  : in std_logic_vector(7 downto 0);
-      Data_in  : in std_logic_vector(23 downto 0);
-      Data_out : out std_logic_vector(23 downto 0) 
+      Data_in  : in std_logic_vector(23 downto 0); 
+      Data_out : out std_logic_vector(23 downto 0)
     );
   end component;
   
@@ -98,6 +105,10 @@ architecture Behavioral of Processor_Unit is
   signal video_ctrl_reg : std_logic_vector(7 downto 0) := x"10";
   signal lfsr_reset_n : std_logic;
   signal internal_key_buffer : std_logic_vector(3 downto 0) := (others => '0');
+  signal s_rom_data_out : std_logic_vector(23 downto 0);
+  signal s_ram_data_out : std_logic_vector(23 downto 0);
+  signal s_ram_we       : std_logic;
+  constant MEM_SPLIT_ADDR : integer := 209;
 
 begin
 
@@ -118,13 +129,20 @@ begin
          end if;
     end process;
 
-  U_Mem : Memory_Store_RAM 
-        port map (
-            clk => master_clk, 
-            we => mem_we,
-            Addr_in => mem_addr_reg, 
-            Data_in => mem_data_to_ram, 
-            Data_out => mem_data_from_ram);
+  U_ROM_Inst : Memoria_ROM
+    port map (
+        Addr_in  => mem_addr_reg,
+        Data_out => s_rom_data_out
+    );
+
+    U_RAM_Inst : Memoria_RAM
+    port map (
+        clk      => master_clk,
+        we       => s_ram_we,       -- Usamos la señal calculada abajo
+        Addr_in  => mem_addr_reg,
+        Data_in  => mem_data_to_ram,
+        Data_out => s_ram_data_out
+    );
             
   U_ALM : Arithmetic_Logic_Module port map (
             op_A => arith_in_A, 
@@ -171,7 +189,27 @@ begin
   op_code <= instr_reg(23 downto 16);
   operand_1 <= instr_reg(15 downto 8);
   operand_2 <= instr_reg(7 downto 0);
+  -- 1. Control de Escritura: Solo habilitar RAM si 'mem_we' es 1 Y la dirección es alta
+    process(mem_we, mem_addr_reg)
+    begin
+        if (mem_we = '1') and (to_integer(unsigned(mem_addr_reg)) >= MEM_SPLIT_ADDR) then
+            s_ram_we <= '1';
+        else
+            s_ram_we <= '0';
+        end if;
+    end process;
 
+    -- 2. Multiplexor de Lectura: El bus de datos recibe de ROM o RAM según la dirección
+    -- Nota: Esto reemplaza la conexión directa que tenía 'mem_data_from_ram'
+    process(mem_addr_reg, s_rom_data_out, s_ram_data_out)
+    begin
+        if to_integer(unsigned(mem_addr_reg)) < MEM_SPLIT_ADDR then
+            mem_data_from_ram <= s_rom_data_out;
+        else
+            mem_data_from_ram <= s_ram_data_out;
+        end if;
+    end process;
+	 
   -- Main FSM
   FSM_Process : process(master_clk)
   begin

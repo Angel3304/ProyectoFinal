@@ -2,46 +2,41 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
-entity Memory_Store_RAM is
+entity Memoria_ROM is
     port(
-        clk, we  : in std_logic;
-        Addr_in  : in std_logic_vector(7 downto 0);
-        Data_in  : in std_logic_vector(23 downto 0); 
-        Data_out : out std_logic_vector(23 downto 0) 
+        Addr_in  : in  std_logic_vector(7 downto 0);
+        Data_out : out std_logic_vector(23 downto 0)
     );
-end entity Memory_Store_RAM;
+end entity Memoria_ROM;
 
-architecture Behavioral of Memory_Store_RAM is
+architecture Behavioral of Memoria_ROM is
+    -- Constantes de Opcodes y Direcciones (Movidas aquí)
+    constant OP_LDX   : std_logic_vector(7 downto 0) := x"01";
+    constant OP_LDY   : std_logic_vector(7 downto 0) := x"02";
+    constant OP_ADD   : std_logic_vector(7 downto 0) := x"03";
+    constant OP_SUB   : std_logic_vector(7 downto 0) := x"09"; 
+    constant OP_CMP   : std_logic_vector(7 downto 0) := x"05";
+    constant OP_DISP  : std_logic_vector(7 downto 0) := x"06";
+    constant OP_JUMP  : std_logic_vector(7 downto 0) := x"07";
+    constant OP_BR_NZ : std_logic_vector(7 downto 0) := x"08"; 
+    constant OP_WAIT  : std_logic_vector(7 downto 0) := x"0A";
+    constant OP_DIV   : std_logic_vector(7 downto 0) := x"10"; 
+    constant OP_STX   : std_logic_vector(7 downto 0) := x"11";
+    constant OP_LDI   : std_logic_vector(7 downto 0) := x"12"; 
+    constant OP_LDIY  : std_logic_vector(7 downto 0) := x"13";
 
-  -- OPCODES
-  constant OP_LDX   : std_logic_vector(7 downto 0) := x"01";
-  constant OP_LDY   : std_logic_vector(7 downto 0) := x"02";
-  constant OP_ADD   : std_logic_vector(7 downto 0) := x"03";
-  constant OP_SUB   : std_logic_vector(7 downto 0) := x"09"; 
-  constant OP_CMP   : std_logic_vector(7 downto 0) := x"05";
-  constant OP_DISP  : std_logic_vector(7 downto 0) := x"06";
-  constant OP_JUMP  : std_logic_vector(7 downto 0) := x"07";
-  constant OP_BR_NZ : std_logic_vector(7 downto 0) := x"08"; 
-  constant OP_WAIT  : std_logic_vector(7 downto 0) := x"0A";
-  constant OP_DIV   : std_logic_vector(7 downto 0) := x"10"; 
-  constant OP_STX   : std_logic_vector(7 downto 0) := x"11";
-  constant OP_LDI   : std_logic_vector(7 downto 0) := x"12"; 
-  constant OP_LDIY  : std_logic_vector(7 downto 0) := x"13";
+    constant R_SALDO     : std_logic_vector(7 downto 0) := x"D1";
+    constant W_SALDO     : std_logic_vector(7 downto 0) := x"D3";
+    constant R_APUESTA   : std_logic_vector(7 downto 0) := x"D4";
+    constant W_APUESTA   : std_logic_vector(7 downto 0) := x"D6";
+    constant R_RESULTADO : std_logic_vector(7 downto 0) := x"D7";
+    constant W_RESULTADO : std_logic_vector(7 downto 0) := x"D9";
 
-  type t_mem_array is array (0 to 255) of std_logic_vector(7 downto 0);
+    type t_rom_array is array (0 to 255) of std_logic_vector(7 downto 0);
 
-  -- [CAMBIO 1] MAPA DE MEMORIA REUBICADO
-  -- Movemos las variables a xD1 (209) para dejar espacio al código nuevo.
-  -- Nota: xE0 son los LEDs y xD0 es el Video, usamos el espacio intermedio.
-  constant R_SALDO     : std_logic_vector(7 downto 0) := x"D1"; -- 209
-  constant W_SALDO     : std_logic_vector(7 downto 0) := x"D3"; -- 211
-  constant R_APUESTA   : std_logic_vector(7 downto 0) := x"D4"; -- 212
-  constant W_APUESTA   : std_logic_vector(7 downto 0) := x"D6"; -- 214
-  constant R_RESULTADO : std_logic_vector(7 downto 0) := x"D7"; -- 215
-  constant W_RESULTADO : std_logic_vector(7 downto 0) := x"D9"; -- 217
-
-  constant ROM_CODE : t_mem_array := (
-    -- 1. INICIALIZACIÓN (Dir 0)
+    -- COPIA AQUÍ TU CONSTANTE ROM_CODE COMPLETA (La misma que tenías antes)
+    constant ROM_CODE : t_rom_array := (
+        -- 1. INICIALIZACIÓN (Dir 0)
     -- =========================================================
     0 => OP_LDI, 1 => x"32", 2 => x"00",      -- Saldo inicial = 50
     3 => OP_STX, 4 => W_SALDO, 5 => x"00",      
@@ -172,36 +167,19 @@ architecture Behavioral of Memory_Store_RAM is
     -- 5. Bucle Infinito (Dead Loop)
     -- Salta a la misma instrucción (192) para que "no deje apostar"
     192 => OP_JUMP, 193 => x"C0",    194 => x"00",
-
-    others => x"00"
-  );
-
-  signal RAM_DATA : t_mem_array := (others => x"00");
+        others => x"00"
+    );
 
 begin
-    -- Memoria Split
-    process(Addr_in, RAM_DATA) 
+    process(Addr_in)
         variable addr_int : integer;
     begin
         addr_int := to_integer(unsigned(Addr_in));
-        
-        -- [CAMBIO 4] Aumentamos el límite de código ROM a 209 (antes 190)
-        -- para que la nueva rutina en 177-194 se lea correctamente desde ROM_CODE
-        if addr_int < 209 then
+        -- Leemos 3 bytes para formar la instrucción de 24 bits
+        if addr_int <= 253 then
             Data_out <= ROM_CODE(addr_int) & ROM_CODE(addr_int + 1) & ROM_CODE(addr_int + 2);
         else
-            Data_out <= RAM_DATA(addr_int) & RAM_DATA(addr_int + 1) & RAM_DATA(addr_int + 2);
+            Data_out <= (others => '0');
         end if;
     end process;
-
-    process(clk)
-    begin
-        if rising_edge(clk) then
-            -- Solo escribir en zona de Datos (>= 209)
-            if we = '1' and to_integer(unsigned(Addr_in)) >= 209 then
-                RAM_DATA(to_integer(unsigned(Addr_in))) <= Data_in(7 downto 0);
-            end if;
-        end if;
-    end process;
-
 end architecture;
